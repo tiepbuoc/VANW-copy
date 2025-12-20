@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân Tích Văn Bản</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 700px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+            text-align: center;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            font-size: 16px;
+            resize: vertical;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .recording-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .record-btn {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            border: none;
+            border-radius: 50px;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .record-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(255, 154, 158, 0.4);
+        }
+        
+        .record-btn.recording {
+            background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .analyze-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .analyze-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .analyze-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-section {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #e9ecef;
+            margin-top: 20px;
+        }
+        
+        .result-section.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .score-display {
+            font-size: 48px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .comment {
+            font-size: 18px;
+            color: #555;
+            line-height: 1.6;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e9ecef;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Phân Tích Văn Bản</h1>
+        
+        <div class="input-section">
+            <label for="textInput">Nhập văn bản cần phân tích:</label>
+            <textarea id="textInput" placeholder="Nhập văn bản của bạn tại đây..."></textarea>
+        </div>
+        
+        <div class="recording-section">
+            <button class="record-btn" id="recordBtn">
+                <span>🎤</span>
+                <span id="recordText">Bắt đầu thu âm</span>
+            </button>
+        </div>
+        
+        <div id="statusMessage" class="status"></div>
+        
+        <button class="analyze-btn" id="analyzeBtn">Phân Tích</button>
+        
+        <div class="result-section" id="resultSection">
+            <div class="result-header">
+                <h2>Kết quả phân tích</h2>
+                <div class="score-display" id="scoreDisplay">0</div>
+            </div>
+            <div class="comment" id="commentText"></div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyApPDeqgSyqFad6noRxdlZocBhNXj3GJ4k",
+            authDomain: "hmtuan002-faa7c.firebaseapp.com",
+            projectId: "hmtuan002-faa7c",
+            storageBucket: "hmtuan002-faa7c.firebasestorage.app",
+            messagingSenderId: "974600759602",
+            appId: "1:974600759602:web:a8d094429ddb75a17f0f2b",
+            measurementId: "G-16F7BSVKWZ"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // DOM Elements
+        const recordBtn = document.getElementById('recordBtn');
+        const recordText = document.getElementById('recordText');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultSection = document.getElementById('resultSection');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const commentText = document.getElementById('commentText');
+        const statusMessage = document.getElementById('statusMessage');
+
+        let isRecording = false;
+        let pollingInterval = null;
+        let pollingTimeout = null;
+        let currentDataId = null;
+
+        // Recording simulation
+        recordBtn.addEventListener('click', () => {
+            isRecording = !isRecording;
+            
+            if (isRecording) {
+                recordBtn.classList.add('recording');
+                recordText.textContent = 'Đang thu âm...';
+                statusMessage.textContent = 'Đang thu âm (giả lập)... Nhấn lại để dừng';
+                statusMessage.className = 'status info';
+            } else {
+                recordBtn.classList.remove('recording');
+                recordText.textContent = 'Bắt đầu thu âm';
+                statusMessage.textContent = 'Đã dừng thu âm';
+                statusMessage.className = 'status success';
+                setTimeout(() => {
+                    statusMessage.textContent = '';
+                }, 2000);
+            }
+        });
+
+        // Analyze button handler
+        analyzeBtn.addEventListener('click', async () => {
+            const textInput = document.getElementById('textInput').value;
+            
+            if (!textInput.trim() && !isRecording) {
+                statusMessage.textContent = 'Vui lòng nhập văn bản hoặc thu âm trước khi phân tích';
+                statusMessage.className = 'status error';
+                return;
+            }
+            
+            // Show loading state
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Đang phân tích...';
+            statusMessage.textContent = 'Đang tìm kiếm điểm số từ cơ sở dữ liệu...';
+            statusMessage.className = 'status info';
+            resultSection.classList.remove('show');
+            
+            // Start polling for data
+            startPollingForScore();
+        });
+
+        // Function to start polling for score data
+        function startPollingForScore() {
+            let elapsedTime = 0;
+            const maxTime = 10000; // 10 seconds
+            const interval = 250; // 0.25 seconds
+            
+            // Clear any existing intervals/timeouts
+            if (pollingInterval) clearInterval(pollingInterval);
+            if (pollingTimeout) clearTimeout(pollingTimeout);
+            
+            pollingInterval = setInterval(async () => {
+                elapsedTime += interval;
+                
+                try {
+                    // Get the latest score from Firestore
+                    const snapshot = await db.collection('scores')
+                        .orderBy('timestamp', 'desc')
+                        .limit(1)
+                        .get();
+                    
+                    if (!snapshot.empty) {
+                        const doc = snapshot.docs[0];
+                        const data = doc.data();
+                        currentDataId = doc.id;
+                        
+                        // Process the score
+                        processScoreData(data);
+                        
+                        // Clear polling
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        
+                        // Reset button
+                        analyzeBtn.disabled = false;
+                        analyzeBtn.textContent = 'Phân Tích';
+                        
+                        return;
+                    }
+                    
+                    // Update status message
+                    statusMessage.textContent = `Đang tìm kiếm... (${elapsedTime/1000}s/${maxTime/1000}s)`;
+                    
+                    // If max time reached
+                    if (elapsedTime >= maxTime) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        
+                        statusMessage.textContent = 'Không tìm thấy điểm số trong cơ sở dữ liệu. Vui lòng đảm bảo đã lưu điểm ở Code 1.';
+                        statusMessage.className = 'status error';
+                        
+                        analyzeBtn.disabled = false;
+                        analyzeBtn.textContent = 'Phân Tích';
+                    }
+                    
+                } catch (error) {
+                    console.error('Lỗi khi đọc dữ liệu:', error);
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    
+                    statusMessage.textContent = 'Có lỗi xảy ra khi đọc dữ liệu';
+                    statusMessage.className = 'status error';
+                    
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.textContent = 'Phân Tích';
+                }
+            }, interval);
+            
+            // Set timeout to stop polling after 10 seconds
+            pollingTimeout = setTimeout(() => {
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    
+                    statusMessage.textContent = 'Hết thời gian chờ. Vui lòng thử lại.';
+                    statusMessage.className = 'status error';
+                    
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.textContent = 'Phân Tích';
+                }
+            }, maxTime);
+        }
+
+        // Function to process score data and display results
+        async function processScoreData(data) {
+            const score = data.score;
+            
+            // Get comment based on score
+            let comment = '';
+            switch(score) {
+                case 10:
+                    comment = "Có vẻ bạn đã đọc sai văn bản";
+                    break;
+                case 30:
+                    comment = "Bạn cần cải thiện phát âm và ngữ điệu";
+                    break;
+                case 50:
+                    comment = "Mức độ trung bình, cần luyện tập thêm";
+                    break;
+                case 70:
+                    comment = "Khá tốt, nhưng vẫn còn một số lỗi nhỏ";
+                    break;
+                case 80:
+                    comment = "Tốt, phát âm rõ ràng và tự nhiên";
+                    break;
+                case 90:
+                    comment = "Xuất sắc! Phát âm chuẩn và truyền cảm";
+                    break;
+                default:
+                    comment = "Điểm số không xác định";
+            }
+            
+            // Display results
+            scoreDisplay.textContent = score;
+            commentText.textContent = comment;
+            resultSection.classList.add('show');
+            
+            statusMessage.textContent = 'Đã tìm thấy và phân tích điểm số thành công!';
+            statusMessage.className = 'status success';
+            
+            // Delete the data from Firestore after displaying
+            await deleteScoreData();
+            
+            // Clear status message after 3 seconds
+            setTimeout(() => {
+                statusMessage.textContent = '';
+            }, 3000);
+        }
+
+        // Function to delete score data from Firestore
+        async function deleteScoreData() {
+            if (!currentDataId) return;
+            
+            try {
+                await db.collection('scores').doc(currentDataId).delete();
+                console.log('Đã xóa dữ liệu điểm số');
+                currentDataId = null;
+            } catch (error) {
+                console.error('Lỗi khi xóa dữ liệu:', error);
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (pollingInterval) clearInterval(pollingInterval);
+            if (pollingTimeout) clearTimeout(pollingTimeout);
+        });
+    </script>
+</body>
+</html>

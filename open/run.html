@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Máy ảnh</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        /* RESET & BASE */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, Roboto, 'Segoe UI', sans-serif;
+            background-color: #000;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            touch-action: pan-y pinch-zoom;
+        }
+        
+        /* TOP BAR */
+        .top-bar {
+            height: 60px;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            z-index: 20;
+        }
+        
+        .top-left {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        
+        .top-right {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 24px;
+        }
+        
+        .top-icon {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }
+        
+        .aspect-ratio {
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        /* CAMERA PREVIEW */
+        .preview-container {
+            flex: 1;
+            position: relative;
+            background-color: #111;
+            overflow: hidden;
+        }
+        
+        .camera-preview {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #camera-view {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+            transform: scaleX(-1);
+        }
+        
+        .demo-camera-feed {
+            width: 100%;
+            height: 100%;
+            background: #111;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .camera-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #ccc;
+            padding: 20px;
+        }
+        
+        .camera-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #555;
+        }
+        
+        /* ZOOM CONTROLS */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 8px 16px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+        }
+        
+        .zoom-option {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .zoom-option.active {
+            background: #fff;
+            color: #000;
+        }
+        
+        /* GRID OVERLAY */
+        .grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0.4;
+            background-image: 
+                linear-gradient(to right, #fff 1px, transparent 1px),
+                linear-gradient(to bottom, #fff 1px, transparent 1px);
+            background-size: calc(100% / 3) calc(100% / 3);
+            display: none;
+        }
+        
+        .grid-overlay.active {
+            display: block;
+        }
+        
+        /* BOTTOM BAR */
+        .bottom-bar {
+            height: 140px;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            z-index: 10;
+        }
+        
+        .mode-selector {
+            display: flex;
+            gap: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .mode-item {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 8px 4px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .mode-item.active {
+            color: #fff;
+            font-weight: 600;
+        }
+        
+        .mode-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 2px;
+            background-color: #fff;
+            border-radius: 1px;
+        }
+        
+        /* MAIN CONTROLS */
+        .main-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 48px;
+            width: 100%;
+        }
+        
+        /* GALLERY THUMBNAIL */
+        .gallery-thumbnail {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            background-color: #222;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .gallery-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* CAPTURE BUTTON */
+        .capture-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: #fff;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.1s;
+        }
+        
+        .capture-button:active {
+            transform: scale(0.95);
+        }
+        
+        .capture-button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        /* FLIP CAMERA BUTTON */
+        .flip-camera {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        /* MODALS */
+        .flash-modal, .timer-modal {
+            position: absolute;
+            top: 60px;
+            background: rgba(40, 40, 40, 0.95);
+            border-radius: 8px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 120px;
+            z-index: 100;
+        }
+        
+        .flash-modal {
+            left: 16px;
+        }
+        
+        .timer-modal {
+            right: 16px;
+        }
+        
+        .flash-modal.active, .timer-modal.active {
+            display: flex;
+        }
+        
+        .flash-option {
+            background: none;
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            text-align: left;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .flash-option.active {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        /* GALLERY MODAL */
+        .gallery-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+        }
+        
+        .gallery-header {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: rgba(0, 0, 0, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .gallery-title {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        .gallery-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .gallery-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        
+        /* Date section in gallery */
+        .date-section {
+            margin-bottom: 20px;
+        }
+        
+        .date-header {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 12px;
+            padding: 8px 4px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+        
+        .gallery-item {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #222;
+            position: relative;
+        }
+        
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Delete button for gallery items */
+        .delete-photo {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 0.7rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .gallery-item:hover .delete-photo {
+            opacity: 1;
+        }
+        
+        /* Empty gallery state */
+        .empty-gallery {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-gallery i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        /* CAPTURED IMAGE */
+        #captured-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+            z-index: 5;
+        }
+        
+        /* CAPTURE FLASH */
+        .capture-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 15;
+        }
+        
+        @keyframes flash {
+            0% { opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
+        
+        .capture-flash.active {
+            animation: flash 0.3s ease-out;
+        }
+        
+        /* ZOOM INDICATOR */
+        .zoom-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 500;
+            display: none;
+            z-index: 10;
+        }
+        
+        /* CANVAS (hidden) */
+        #camera-canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="top-left">
+            <!-- Cài đặt (30 điểm) -->
+            <button class="top-icon" id="settings-btn" title="Cài đặt">
+                <i class="fas fa-cog"></i>
+            </button>
+            
+            <!-- Flash (50 điểm) -->
+            <div class="flash-container">
+                <button class="top-icon" id="flash-btn" title="Flash">
+                    <i class="fas fa-bolt"></i>
+                </button>
+                
+                <div class="flash-modal" id="flash-modal">
+                    <button class="flash-option active" data-flash="auto">
+                        <i class="fas fa-bolt"></i> Auto
+                    </button>
+                    <button class="flash-option" data-flash="on">
+                        <i class="fas fa-bolt"></i> Bật
+                    </button>
+                    <button class="flash-option" data-flash="off">
+                        <i class="far fa-bolt"></i> Tắt
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="top-right">
+            <!-- Đồng hồ (70 điểm) -->
+            <div class="timer-container">
+                <button class="top-icon" id="timer-btn" title="Hẹn giờ">
+                    <i class="far fa-clock"></i>
+                </button>
+                
+                <div class="timer-modal" id="timer-modal">
+                    <button class="flash-option" data-timer="0">Không hẹn giờ</button>
+                    <button class="flash-option" data-timer="3">3 giây</button>
+                    <button class="flash-option" data-timer="5">5 giây</button>
+                    <button class="flash-option" data-timer="10">10 giây</button>
+                </div>
+            </div>
+            
+            <!-- Tỷ lệ 3:4 (80 điểm) -->
+            <div class="aspect-ratio" id="aspect-ratio">3:4</div>
+        </div>
+    </div>
+    
+    <!-- CAMERA PREVIEW -->
+    <div class="preview-container">
+        <div class="camera-preview">
+            <!-- Camera feed -->
+            <video id="camera-view" autoplay playsinline></video>
+            
+            <!-- Captured image preview -->
+            <img id="captured-image" alt="Ảnh đã chụp">
+            
+            <!-- Hidden canvas for capturing -->
+            <canvas id="camera-canvas"></canvas>
+            
+            <!-- Placeholder when camera is off -->
+            <div class="demo-camera-feed" id="demo-camera-feed">
+                <div class="camera-placeholder">
+                    <i class="fas fa-camera camera-icon"></i>
+                    <p>Nhấn nút chụp để bật camera</p>
+                </div>
+            </div>
+            
+            <!-- Flash effect -->
+            <div class="capture-flash" id="capture-flash"></div>
+            
+            <!-- Grid overlay -->
+            <div class="grid-overlay" id="grid-overlay"></div>
+            
+            <!-- Zoom controls -->
+            <div class="zoom-controls" id="zoom-controls">
+                <button class="zoom-option active" data-zoom="1">1x</button>
+                <button class="zoom-option" data-zoom="2">2x</button>
+            </div>
+            
+            <!-- Zoom indicator -->
+            <div class="zoom-indicator" id="zoom-indicator">1.0x</div>
+        </div>
+    </div>
+    
+    <!-- BOTTOM BAR -->
+    <div class="bottom-bar">
+        <!-- MODE SELECTOR -->
+        <div class="mode-selector">
+            <button class="mode-item" data-mode="portrait">CHÂN DUNG</button>
+            <button class="mode-item active" data-mode="photo">ẢNH</button>
+            <button class="mode-item" data-mode="video">VIDEO</button>
+            <button class="mode-item" data-mode="more">KHÁC</button>
+        </div>
+        
+        <!-- MAIN CONTROLS -->
+        <div class="main-controls">
+            <!-- Gallery thumbnail with latest photo -->
+            <div class="gallery-thumbnail" id="gallery-thumbnail">
+                <i class="far fa-image" style="color: #666; font-size: 20px;"></i>
+            </div>
+            
+            <!-- Nút chụp ảnh (10 điểm) -->
+            <div class="capture-button" id="capture-button"></div>
+            
+            <!-- Nút đổi camera (90 điểm) -->
+            <button class="flip-camera" id="flip-camera">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- GALLERY MODAL -->
+    <div class="gallery-modal" id="gallery-modal">
+        <div class="gallery-header">
+            <div class="gallery-title">Bộ sưu tập</div>
+            <button class="gallery-close" id="gallery-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="gallery-content" id="gallery-content">
+            <!-- Gallery content will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyApPDeqgSyqFad6noRxdlZocBhNXj3GJ4k",
+            authDomain: "hmtuan002-faa7c.firebaseapp.com",
+            projectId: "hmtuan002-faa7c",
+            storageBucket: "hmtuan002-faa7c.firebasestorage.app",
+            messagingSenderId: "974600759602",
+            appId: "1:974600759602:web:a8d094429ddb75a17f0f2b",
+            measurementId: "G-16F7BSVKWZ"
+        };
+
+        // Initialize Firebase
+        let app;
+        let db;
+        
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase initialized successfully");
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+        }
+
+        // App state
+        const state = {
+            cameraStream: null,
+            isCameraOn: false,
+            isFrontCamera: false,
+            photos: JSON.parse(localStorage.getItem('cameraPhotos')) || [],
+            currentMode: 'photo',
+            flashMode: 'auto',
+            timer: 0,
+            gridEnabled: false,
+            zoomLevel: 1,
+            lastScore: null
+        };
+        
+        // DOM elements
+        const elements = {
+            cameraView: document.getElementById('camera-view'),
+            cameraCanvas: document.getElementById('camera-canvas'),
+            capturedImage: document.getElementById('captured-image'),
+            demoCameraFeed: document.getElementById('demo-camera-feed'),
+            captureButton: document.getElementById('capture-button'),
+            flipCameraBtn: document.getElementById('flip-camera'),
+            galleryThumbnail: document.getElementById('gallery-thumbnail'),
+            galleryModal: document.getElementById('gallery-modal'),
+            galleryContent: document.getElementById('gallery-content'),
+            galleryClose: document.getElementById('gallery-close'),
+            captureFlash: document.getElementById('capture-flash'),
+            gridOverlay: document.getElementById('grid-overlay'),
+            settingsBtn: document.getElementById('settings-btn'),
+            flashBtn: document.getElementById('flash-btn'),
+            flashModal: document.getElementById('flash-modal'),
+            timerBtn: document.getElementById('timer-btn'),
+            timerModal: document.getElementById('timer-modal'),
+            zoomControls: document.getElementById('zoom-controls'),
+            zoomIndicator: document.getElementById('zoom-indicator'),
+            aspectRatio: document.getElementById('aspect-ratio')
+        };
+        
+        // Initialize app
+        function initApp() {
+            createSamplePhotosIfNeeded();
+            updateGalleryThumbnail();
+            setupEventListeners();
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Nút chụp ảnh - 10 điểm
+            elements.captureButton.addEventListener('click', () => {
+                saveScoreToFirebase(10);
+                capturePhoto();
+            });
+            
+            // Nút cài đặt - 30 điểm
+            elements.settingsBtn.addEventListener('click', () => {
+                saveScoreToFirebase(30);
+                toggleGrid();
+            });
+            
+            // Nút flash - 50 điểm
+            elements.flashBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                saveScoreToFirebase(50);
+                toggleFlashModal();
+            });
+            
+            // Nút đồng hồ - 70 điểm
+            elements.timerBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                saveScoreToFirebase(70);
+                toggleTimerModal();
+            });
+            
+            // Nút tỷ lệ 3:4 - 80 điểm
+            elements.aspectRatio.addEventListener('click', () => {
+                saveScoreToFirebase(80);
+                toggleAspectRatio();
+            });
+            
+            // Nút đổi camera - 90 điểm
+            elements.flipCameraBtn.addEventListener('click', () => {
+                saveScoreToFirebase(90);
+                flipCamera();
+            });
+            
+            // Các sự kiện khác
+            document.querySelectorAll('.zoom-option').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const newZoom = parseFloat(e.target.dataset.zoom);
+                    if (state.zoomLevel !== newZoom) {
+                        saveScoreToFirebase(90); // Đổi zoom cũng là 90 điểm
+                    }
+                    changeZoomLevel(newZoom);
+                });
+            });
+            
+            // Gallery thumbnail click - XÓA TOÀN BỘ DỮ LIỆU FIRESTORE
+            elements.galleryThumbnail.addEventListener('click', async () => {
+                // Xóa toàn bộ dữ liệu trong Firestore trước khi mở gallery
+                await deleteAllFirestoreData();
+                
+                // Sau đó mở gallery như bình thường
+                renderGallery();
+                elements.galleryModal.style.display = 'flex';
+            });
+            
+            // Close gallery
+            elements.galleryClose.addEventListener('click', () => {
+                elements.galleryModal.style.display = 'none';
+            });
+            
+            // Flash options
+            document.querySelectorAll('[data-flash]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.flashMode = e.target.dataset.flash;
+                    
+                    document.querySelectorAll('[data-flash]').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    
+                    let icon = 'fas fa-bolt';
+                    if (state.flashMode === 'off') icon = 'far fa-bolt';
+                    elements.flashBtn.innerHTML = `<i class="${icon}"></i>`;
+                    
+                    elements.flashModal.classList.remove('active');
+                });
+            });
+            
+            // Timer options
+            document.querySelectorAll('[data-timer]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    state.timer = parseInt(e.target.dataset.timer);
+                    
+                    if (state.timer > 0) {
+                        elements.timerBtn.innerHTML = `<i class="fas fa-clock"></i>`;
+                    } else {
+                        elements.timerBtn.innerHTML = `<i class="far fa-clock"></i>`;
+                    }
+                    
+                    elements.timerModal.classList.remove('active');
+                });
+            });
+            
+            // Close modals when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.flash-modal') && !e.target.closest('#flash-btn')) {
+                    elements.flashModal.classList.remove('active');
+                }
+                if (!e.target.closest('.timer-modal') && !e.target.closest('#timer-btn')) {
+                    elements.timerModal.classList.remove('active');
+                }
+            });
+            
+            // Mode selection
+            document.querySelectorAll('.mode-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    document.querySelectorAll('.mode-item').forEach(i => i.classList.remove('active'));
+                    e.target.classList.add('active');
+                    state.currentMode = e.target.dataset.mode;
+                });
+            });
+        }
+        
+        // Save score to Firebase (KHÔNG HIỂN THỊ THÔNG BÁO)
+        async function saveScoreToFirebase(score) {
+            try {
+                if (!db) {
+                    console.error("Firestore not initialized");
+                    return;
+                }
+                
+                // Generate a unique ID for this submission
+                const submissionId = 'score_' + Date.now();
+                
+                // Save to Firestore
+                await db.collection('scores').doc(submissionId).set({
+                    score: score,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    id: submissionId,
+                    source: 'camera_app'
+                });
+                
+                console.log(`Đã lưu ${score} điểm vào Firestore (ẩn)`);
+                
+            } catch (error) {
+                console.error('Lỗi khi lưu điểm:', error);
+            }
+        }
+        
+        // Delete all data from Firestore
+        async function deleteAllFirestoreData() {
+            try {
+                if (!db) {
+                    console.error("Firestore not initialized");
+                    return;
+                }
+                
+                // Get all documents in the scores collection
+                const snapshot = await db.collection('scores').get();
+                
+                // Delete each document
+                const deletePromises = [];
+                snapshot.forEach(doc => {
+                    deletePromises.push(db.collection('scores').doc(doc.id).delete());
+                });
+                
+                // Wait for all deletions to complete
+                await Promise.all(deletePromises);
+                
+                console.log(`Đã xóa ${snapshot.size} bản ghi từ Firestore`);
+                
+            } catch (error) {
+                console.error('Lỗi khi xóa dữ liệu Firestore:', error);
+            }
+        }
+        
+        // Start camera
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: state.isFrontCamera ? 'user' : 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                state.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                elements.cameraView.srcObject = state.cameraStream;
+                elements.cameraView.style.display = 'block';
+                elements.demoCameraFeed.style.display = 'none';
+                elements.capturedImage.style.display = 'none';
+                state.isCameraOn = true;
+                
+                showNotification("Camera đã được bật");
+            } catch (error) {
+                console.error("Camera error:", error);
+                showNotification("Không thể truy cập camera");
+            }
+        }
+        
+        // Stop camera
+        function stopCamera() {
+            if (state.cameraStream) {
+                state.cameraStream.getTracks().forEach(track => track.stop());
+                state.cameraStream = null;
+            }
+            
+            elements.cameraView.style.display = 'none';
+            elements.demoCameraFeed.style.display = 'flex';
+            state.isCameraOn = false;
+        }
+        
+        // Capture photo
+        function capturePhoto() {
+            if (!state.isCameraOn) {
+                startCamera();
+                return;
+            }
+            
+            // Show flash effect
+            elements.captureFlash.classList.add('active');
+            setTimeout(() => {
+                elements.captureFlash.classList.remove('active');
+            }, 300);
+            
+            // Draw to canvas
+            const context = elements.cameraCanvas.getContext('2d');
+            elements.cameraCanvas.width = elements.cameraView.videoWidth;
+            elements.cameraCanvas.height = elements.cameraView.videoHeight;
+            
+            if (state.isFrontCamera) {
+                context.translate(elements.cameraCanvas.width, 0);
+                context.scale(-1, 1);
+            }
+            
+            context.drawImage(elements.cameraView, 0, 0, elements.cameraCanvas.width, elements.cameraCanvas.height);
+            
+            // Save photo
+            const photoDataUrl = elements.cameraCanvas.toDataURL('image/png');
+            const now = new Date();
+            
+            const photo = {
+                id: Date.now(),
+                dataUrl: photoDataUrl,
+                timestamp: now.getTime(),
+                date: now.toISOString(),
+                displayDate: formatDisplayDate(now),
+                sectionDate: formatSectionDate(now)
+            };
+            
+            state.photos.unshift(photo);
+            localStorage.setItem('cameraPhotos', JSON.stringify(state.photos));
+            
+            // Show preview
+            elements.capturedImage.src = photoDataUrl;
+            elements.cameraView.style.display = 'none';
+            elements.capturedImage.style.display = 'block';
+            
+            // Update thumbnail
+            updateGalleryThumbnail();
+            
+            showNotification("Đã chụp ảnh");
+            
+            // Return to camera view after 3 seconds
+            setTimeout(() => {
+                if (state.isCameraOn) {
+                    elements.capturedImage.style.display = 'none';
+                    elements.cameraView.style.display = 'block';
+                }
+            }, 3000);
+        }
+        
+        // Flip camera
+        function flipCamera() {
+            state.isFrontCamera = !state.isFrontCamera;
+            stopCamera();
+            setTimeout(() => {
+                startCamera();
+            }, 300);
+            
+            // Update flip transform
+            elements.cameraView.style.transform = state.isFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
+        }
+        
+        // Toggle grid
+        function toggleGrid() {
+            state.gridEnabled = !state.gridEnabled;
+            elements.gridOverlay.classList.toggle('active', state.gridEnabled);
+            showNotification(state.gridEnabled ? 'Đã bật lưới' : 'Đã tắt lưới');
+        }
+        
+        // Toggle flash modal
+        function toggleFlashModal() {
+            elements.flashModal.classList.toggle('active');
+            elements.timerModal.classList.remove('active');
+        }
+        
+        // Toggle timer modal
+        function toggleTimerModal() {
+            elements.timerModal.classList.toggle('active');
+            elements.flashModal.classList.remove('active');
+        }
+        
+        // Toggle aspect ratio
+        function toggleAspectRatio() {
+            const currentRatio = elements.aspectRatio.textContent;
+            const newRatio = currentRatio === '3:4' ? '16:9' : '3:4';
+            elements.aspectRatio.textContent = newRatio;
+            showNotification(`Tỷ lệ khung hình: ${newRatio}`);
+        }
+        
+        // Change zoom level
+        function changeZoomLevel(newZoom) {
+            state.zoomLevel = newZoom;
+            
+            document.querySelectorAll('.zoom-option').forEach(b => b.classList.remove('active'));
+            document.querySelector(`[data-zoom="${newZoom}"]`).classList.add('active');
+            
+            // Apply zoom to camera view
+            if (state.isCameraOn) {
+                elements.cameraView.style.transform = `scale(${state.zoomLevel}) ${state.isFrontCamera ? 'scaleX(-1)' : ''}`;
+            }
+            
+            // Show indicator
+            elements.zoomIndicator.textContent = `${state.zoomLevel.toFixed(1)}x`;
+            elements.zoomIndicator.style.display = 'block';
+            
+            setTimeout(() => {
+                elements.zoomIndicator.style.display = 'none';
+            }, 1500);
+        }
+        
+        // Update gallery thumbnail
+        function updateGalleryThumbnail() {
+            if (state.photos.length > 0) {
+                const latestPhoto = state.photos[0];
+                
+                // Clear previous content
+                elements.galleryThumbnail.innerHTML = '';
+                
+                // Create and add image
+                const img = document.createElement('img');
+                img.src = latestPhoto.dataUrl;
+                img.alt = 'Ảnh gần nhất';
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '50%';
+                
+                elements.galleryThumbnail.appendChild(img);
+            } else {
+                // If no photos, show default icon
+                elements.galleryThumbnail.innerHTML = '<i class="far fa-image" style="color: #666; font-size: 20px;"></i>';
+            }
+        }
+        
+        // Format date for display
+        function formatDisplayDate(date) {
+            return date.toLocaleDateString('vi-VN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Format date for section grouping
+        function formatSectionDate(date) {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            if (date.toDateString() === today.toDateString()) {
+                return 'Hôm nay';
+            } else if (date.toDateString() === yesterday.toDateString()) {
+                return 'Hôm qua';
+            } else {
+                return date.toLocaleDateString('vi-VN', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            }
+        }
+        
+        // Render gallery
+        function renderGallery() {
+            elements.galleryContent.innerHTML = '';
+            
+            if (state.photos.length === 0) {
+                elements.galleryContent.innerHTML = `
+                    <div class="empty-gallery">
+                        <i class="fas fa-image"></i>
+                        <p>Chưa có ảnh nào</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Group photos by date
+            const grouped = {};
+            state.photos.forEach(photo => {
+                if (!grouped[photo.sectionDate]) {
+                    grouped[photo.sectionDate] = [];
+                }
+                grouped[photo.sectionDate].push(photo);
+            });
+            
+            // Sort dates (newest first)
+            const dates = Object.keys(grouped).sort((a, b) => {
+                const timeA = grouped[a][0].timestamp;
+                const timeB = grouped[b][0].timestamp;
+                return timeB - timeA;
+            });
+            
+            // Render each section
+            dates.forEach(date => {
+                const section = document.createElement('div');
+                section.className = 'date-section';
+                
+                const header = document.createElement('div');
+                header.className = 'date-header';
+                header.textContent = date;
+                section.appendChild(header);
+                
+                const grid = document.createElement('div');
+                grid.className = 'photos-grid';
+                
+                grouped[date].forEach(photo => {
+                    const item = document.createElement('div');
+                    item.className = 'gallery-item';
+                    
+                    const img = document.createElement('img');
+                    img.src = photo.dataUrl;
+                    img.alt = `Photo ${photo.id}`;
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-photo';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        deletePhoto(photo.id);
+                    };
+                    
+                    item.appendChild(img);
+                    item.appendChild(deleteBtn);
+                    grid.appendChild(item);
+                });
+                
+                section.appendChild(grid);
+                elements.galleryContent.appendChild(section);
+            });
+        }
+        
+        // Delete photo
+        function deletePhoto(id) {
+            if (confirm('Xóa ảnh này?')) {
+                state.photos = state.photos.filter(photo => photo.id !== id);
+                localStorage.setItem('cameraPhotos', JSON.stringify(state.photos));
+                renderGallery();
+                updateGalleryThumbnail();
+                showNotification('Đã xóa ảnh');
+            }
+        }
+        
+        // Show notification
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 20px;
+                font-size: 14px;
+                z-index: 1000;
+                opacity: 0;
+                transition: opacity 0.3s;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.style.opacity = '1', 10);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
+        // Create sample photos if needed
+        function createSamplePhotosIfNeeded() {
+            if (state.photos.length === 0) {
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                
+                // Create 2 sample photos for today
+                for (let i = 0; i < 2; i++) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 400;
+                    canvas.height = 400;
+                    const ctx = canvas.getContext('2d');
+                    
+                    const gradient = ctx.createLinearGradient(0, 0, 400, 400);
+                    gradient.addColorStop(0, `hsl(${i * 120}, 70%, 30%)`);
+                    gradient.addColorStop(1, `hsl(${i * 120 + 60}, 70%, 20%)`);
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, 400, 400);
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.font = '40px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('📷', 200, 150);
+                    
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText('Ảnh mẫu', 200, 250);
+                    
+                    ctx.font = '16px Arial';
+                    ctx.fillText(`${i + 1}`, 200, 300);
+                    
+                    const photo = {
+                        id: Date.now() + i,
+                        dataUrl: canvas.toDataURL(),
+                        timestamp: today.getTime(),
+                        date: today.toISOString(),
+                        displayDate: formatDisplayDate(today),
+                        sectionDate: formatSectionDate(today)
+                    };
+                    
+                    state.photos.push(photo);
+                }
+                
+                // Create 1 sample photo for yesterday
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 400;
+                const ctx = canvas.getContext('2d');
+                
+                const gradient = ctx.createLinearGradient(0, 0, 400, 400);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 400, 400);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('📷', 200, 150);
+                
+                ctx.font = 'bold 24px Arial';
+                ctx.fillText('Hôm qua', 200, 250);
+                
+                const photo = {
+                    id: Date.now() + 10,
+                    dataUrl: canvas.toDataURL(),
+                    timestamp: yesterday.getTime(),
+                    date: yesterday.toISOString(),
+                    displayDate: formatDisplayDate(yesterday),
+                    sectionDate: formatSectionDate(yesterday)
+                };
+                
+                state.photos.push(photo);
+                
+                localStorage.setItem('cameraPhotos', JSON.stringify(state.photos));
+                updateGalleryThumbnail();
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', initApp);
+        
+        // Clean up on unload
+        window.addEventListener('beforeunload', () => {
+            if (state.cameraStream) {
+                state.cameraStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
